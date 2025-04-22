@@ -13,14 +13,20 @@ const first_session =
   '%7B%22visits%22%3A2%2C%22start%22%3A1744965770445%2C%22last_visit%22%3A1744965771148%2C%22url%22%3A%22https%3A%2F%2Fwww.smartfren.com%2F%22%2C%22path%22%3A%22%2F%22%2C%22referrer%22%3A%22%22%2C%22referrer_info%22%3A%7B%22host%22%3A%22%22%2C%22path%22%3A%22blank%22%2C%22protocol%22%3A%22about%3A%22%2C%22port%22%3A80%2C%22search%22%3A%22%22%2C%22query%22%3A%7B%7D%7D%2C%22search%22%3A%7B%22engine%22%3Anull%2C%22query%22%3Anull%7D%2C%22prev_visit%22%3A1744965770445%2C%22time_since_last_visit%22%3A703%2C%22version%22%3A0.4%7D';
 const tscookie =
   '01b5cb327f9395c12534ce39be0ee95a914aa17fcbf187e350f977635ca46bb22979928162a6f352e511c70347634f2fe2555b35d8135c0f6e44935726d6aab9be8db31ee3';
-
+const phpSessId = 'vn55qoelve50d7cem394h1tgnv';
 // API Endpoint
 const tokenEp = 'api/hello';
 const cmsEp = 'api/authucms';
 const availablePackagesEp = 'api/available-packages';
+const packageDetailEp = 'api/package-detail';
 const authTokenEp = 'payment/v2/api/remote-config';
 const paymentOptionsEp = 'payment/v2/api/payment-options';
 const paymentOrderEp = 'payment/v2/api/payment-order';
+const signInReqEp =
+  'proxy/CUSTINFO_MAIN_URI/sfpas/registry/v4/signin/mdn/request';
+const signInVerifyEp =
+  'proxy/CUSTINFO_MAIN_URI/sfpas/registry/v4/signin/mdn/verify';
+const customerInfoEp = 'proxy/CUSTINFO_URI';
 
 type paymentMethod =
   | 'PULSA'
@@ -72,6 +78,16 @@ type paymentOrderData = {
   transaction_id: string;
 };
 
+type custInfo = {
+  id: string | null;
+  jsonrpc: string | null;
+  method: string;
+  params: string[];
+  my_params: string | null;
+  he_params: string | null;
+  channel: string | null;
+};
+
 // Get Token for using in API
 async function getToken() {
   try {
@@ -121,6 +137,30 @@ async function getAvailablePackages(mdn: string) {
       }),
     });
     const jsonData = await response.json();
+    return jsonData.result.data;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Get detail for specific package
+// Ex: 1ON55RB
+async function getDetailPackage(packId: string) {
+  try {
+    const response = await fetch(`${HOST}/${packageDetailEp}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: '0',
+        jsonrpc: '2.0',
+        packId,
+        method: 'getWebDetailPackage',
+      }),
+    });
+    const jsonData = await response.json();
+    console.log(jsonData.result.data);
     return jsonData.result.data;
   } catch (error) {
     console.error(error);
@@ -185,56 +225,6 @@ async function getPaymentOptions(
   }
 }
 
-// async function paymentOrder(token: string, authToken: string) {
-//   try {
-//     const response = await fetch(`${HOST}/payment/v2/api/payment-order`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         "Content-Length": "449",
-//         Cookie: `_fw_crm_v=${_fw_crm_v};_ga=${_ga};first_session=${first_session};token=${token}; prod=1; staging=0; idGtag=G-GF5MR6BLLK; authToken=${authToken}; _ga_YDY4PB0EBF=${_ga_YDY4PB0EBF}; afUserId=a91194ab-b15b-477e-8729-75e509075f04-p; AF_SYNC=1744983325564; session_id=${token}; TS0182b4fb=${tscookie}; _ga_GF5MR6BLLK=${_ga_GF5MR6BLLK}`,
-//         "Session-Type": "hello",
-//       },
-//       body: JSON.stringify({
-//         type: "buypackage",
-//         extend_data: {
-//           mdn: "0882xxxxxxxx",
-//         },
-//         total_payment: [
-//           {
-//             id: "1ON55RB",
-//             productCode: "1ON55RB",
-//             partnerCode: "",
-//             typeItem: "productCode",
-//             name: "ON Terus 1 Tahun - 18GB",
-//             price: 60500,
-//             promoPrice: 0,
-//             extendData: {
-//               mdn: "0882xxxxxxxx",
-//             },
-//           },
-//         ],
-//         customer_email: "xxx@gmail.com",
-//         payment_method: "PULSA",
-//         account_name: "",
-//         account_email: "",
-//         payment_mdn: "0882xxxxxxxx",
-//         host_name: "www.smartfren.com",
-//         reference_id: "",
-//         partner: "MYWEB",
-//         order_id: "",
-//         transaction_id: "",
-//       }),
-//     });
-
-//     const data = await response.json();
-//     console.log(data);
-//     return data;
-//   } catch (error) {
-//     console.error(error);
-//   }
-// }
-
 //
 async function paymentOrder(
   token: string,
@@ -261,20 +251,109 @@ async function paymentOrder(
   }
 }
 
+// SingIn to get OTP
+async function signInRequest(mdn: string) {
+  try {
+    const response = await fetch(`${HOST}/${signInReqEp}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `first_session=${first_session};PHPSESSID=${phpSessId};`,
+      },
+      body: JSON.stringify({ mdn }),
+    });
+    const jsonData = await response.json();
+    console.log('SIR:', jsonData);
+    return jsonData;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Verify SignIn with OTP to get session token
+async function signInVerify(mdn: string, otp: string) {
+  try {
+    const response = await fetch(`${HOST}/${signInVerifyEp}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `first_session=${first_session};PHPSESSID=${phpSessId};`,
+      },
+      body: JSON.stringify({ mdn, otp }),
+    });
+    const jsonData = await response.json();
+    console.log('SIV:', jsonData);
+    return jsonData.data.result.session_id;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// get customer mobile card info
+async function cardInfo(custInfo: custInfo, mySfSessionId: string) {
+  try {
+    const response = await fetch(`${HOST}/${customerInfoEp}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `first_session=${first_session};PHPSESSID=${phpSessId};mysf_session_id=${mySfSessionId};`,
+      },
+      body: JSON.stringify({
+        ...custInfo,
+        method: 'getSubInfoDetail',
+        params: [`${mySfSessionId}`],
+      }),
+    });
+    const jsonData = await response.json();
+    if (jsonData.message !== 'Success')
+      throw new Error(`${jsonData.error.message}`);
+    const resultCustInfo = jsonData.result.data.resultCustinfo;
+    const resultPackages = jsonData.result.data.resultPackages;
+    const customerInfo = {
+      nomor: resultCustInfo.mobileNo,
+      balance: resultCustInfo.balance,
+      actDate: resultCustInfo.actDate,
+      expDate: resultCustInfo.expDate,
+    };
+    let activePackages = [];
+
+    for (const paket of resultPackages) {
+      activePackages.push({
+        id: paket.packID,
+        name: paket.packName,
+        actDate: paket.packEffDate,
+        expDate: paket.packExpDate,
+      });
+    }
+
+    return { customerInfo, activePackages };
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 mdn = '0882xxxxxxxx';
 email = 'xxx@gmail.com';
-
-console.log('Get Token...');
-token = await getToken();
-console.log('Token: ', token);
-console.log('Get CMS Token...');
-cmsToken = await getAuthUcms(token);
-console.log('CMS Token: ', cmsToken);
+const custInfo: custInfo = {
+  jsonrpc: null,
+  channel: null,
+  id: null,
+  method: 'getAvailPackage',
+  he_params: null,
+  my_params: null,
+  params: [],
+};
+// console.log('Get Token...');
+// token = await getToken();
+// console.log('Token: ', token);
+// console.log('Get CMS Token...');
+// cmsToken = await getAuthUcms(token);
+// console.log('CMS Token: ', cmsToken);
 
 // await getAvailablePackages(mdn);
-console.log('Get Auth Token...');
-authToken = await getAuthToken(token);
-console.log('Auth Token: ', authToken);
+// console.log('Get Auth Token...');
+// authToken = await getAuthToken(token);
+// console.log('Auth Token: ', authToken);
 const paymentOptions: paymentOpt = {
   product_code: '1ON55RB',
   total_payment: 60500,
@@ -316,4 +395,7 @@ const paymentData: paymentOrderData = {
   order_id: '',
   transaction_id: '',
 };
-await paymentOrder(token, authToken, paymentData);
+// await paymentOrder(token, authToken, paymentData);
+
+// await signInRequest(mdn);
+// const mySfSessionId = await signInVerify(mdn, '717203');
